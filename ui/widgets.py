@@ -35,7 +35,8 @@ class Pannel(object):
     def update(self):
         fl = False
         for w in self.widgets:
-            fl = fl or w.update()
+            r = w.update()
+            fl = fl or r
 
         if fl:
             self.display.flip()
@@ -206,7 +207,87 @@ class SevenSegment(Widget):
             self.lastV = self.value
             return True
 
-class Meter(Widget):
+class FancyGauge(Widget):
+    def __init__(self, x, y, r, showPercentage = False, valueFormat = "%d", colour=Colours.green, units = None, maxScale = 25):
+        Widget.__init__(self, x, y)
+        self.r = r
+        self.h = self.w = (2 * r) + 2
+
+        self.value = 0
+        self.lastV = self.value
+        self.valueFormat = valueFormat
+        self.showPercentage = showPercentage
+
+        self.colour = colour
+        self.units = units
+        self.maxScale = maxScale
+
+        self.constructSurface()
+
+    def constructSurface(self):
+        self.meter = pygame.Surface((self.h, self.w))
+
+        pygame.draw.circle(self.meter, Colours.grey, (int(self.w/2), int(self.h/2)), self.r, int(self.r*0.25))
+        #pygame.draw.circle(self.meter, Colours.black, (int(self.w/2), int(self.h/2)), int(self.r * 0.85))
+
+        self.valueFont = pygame.font.Font('carlito.ttf', int(self.r*0.6))
+
+        if self.units:
+            unitFont = pygame.font.Font('carlito.ttf', int(self.r*0.30))
+            w, h = unitFont.size(self.units)
+            units = unitFont.render(self.units, True, (128, 128, 128))
+            self.meter.blit(units, ((self.w / 2) - (w/2), ((self.h/2) - (h/2)) + h))
+    
+    def draw(self):
+        submeter = pygame.Surface((self.h, self.w))
+        submeter.blit(self.meter, (0,0))
+
+        # Draw value text
+        pv = self.value / self.maxScale
+        if pv > 1:
+            pv = 1
+
+        if self.showPercentage:
+            vt = "%d%%" % int(pv*100)
+        else:
+            vt = self.valueFormat % self.value
+            
+        w, h = self.valueFont.size(vt)
+        val = self.valueFont.render(vt, True, self.colour)
+
+        submeter.blit(val, ((self.w / 2) - (w/2), (self.h/2) - (h/2) - 5))
+
+        pi = math.pi
+
+        # Draw the value arc
+        if (pv > 0):
+            pygame.draw.aaline(submeter, self.colour, (self.w/2, 1), (self.w/2, int(self.r*0.25)))
+
+        sm2 = pygame.Surface((self.h, self.w), pygame.SRCALPHA)
+
+        arcSliceD = int(math.ceil(360 * pv))
+        arcSliceR = arcSliceD * pi / 180
+        pygame.draw.arc(sm2, self.colour, (1, 1, self.w - 1, self.h - 1), 0, arcSliceR, int(self.r*0.25))
+
+        orig_rect = sm2.get_rect()
+        sm = pygame.transform.rotate(sm2, 90 - arcSliceD)
+
+        rot_rect = orig_rect.copy()
+        rot_rect.center = sm.get_rect().center
+        sm = sm.subsurface(rot_rect).copy()
+
+        submeter.blit(sm, (0, 0))
+
+        self.display.blit(submeter, (self.x, self.y))
+
+    def update(self):
+        if (self.value != self.lastV) and (self.value <= self.maxScale):
+            self.draw()
+            self.lastV = self.value
+            return True
+
+
+class OldSchoolMeter(Widget):
     def __init__(self, x, y, maxScale = 25):
         Widget.__init__(self, x, y)
         self.h, self.w = 100, 146
