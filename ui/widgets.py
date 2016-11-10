@@ -237,7 +237,26 @@ class FancyGauge(Widget):
             w, h = unitFont.size(self.units)
             units = unitFont.render(self.units, True, (128, 128, 128))
             self.meter.blit(units, ((self.w / 2) - (w/2), ((self.h/2) - (h/2)) + h))
-    
+
+    def arcSlice(self, center, rad1, rad2, angle):
+        arc1 = []
+        arc2 = []
+        pi = math.pi
+        for n in range(-90,angle-90):
+            # Trig is expensive, do it once.
+            cs = math.cos(n*pi/180)
+            ss = math.sin(n*pi/180)
+            
+            arc1.append((center[0] + int(rad1 * cs), center[1] + int(rad1 * ss)))
+            arc2.insert(0, (center[0] + int(rad2 * cs), center[1] + int(rad2 * ss)))
+
+        if not arc1:
+            return []
+
+        arc2.extend(arc1[0])
+        arc1.extend(arc2)
+        return arc1
+
     def draw(self):
         submeter = pygame.Surface((self.h, self.w))
         submeter.blit(self.meter, (0,0))
@@ -257,26 +276,15 @@ class FancyGauge(Widget):
 
         submeter.blit(val, ((self.w / 2) - (w/2), (self.h/2) - (h/2) - 5))
 
-        pi = math.pi
 
         # Draw the value arc
         if (pv > 0):
-            pygame.draw.aaline(submeter, self.colour, (self.w/2, 1), (self.w/2, int(self.r*0.25)))
-
-        sm2 = pygame.Surface((self.h, self.w), pygame.SRCALPHA)
-
-        arcSliceD = int(math.ceil(360 * pv))
-        arcSliceR = arcSliceD * pi / 180
-        pygame.draw.arc(sm2, self.colour, (1, 1, self.w - 1, self.h - 1), 0, arcSliceR, int(self.r*0.25))
-
-        orig_rect = sm2.get_rect()
-        sm = pygame.transform.rotate(sm2, 90 - arcSliceD)
-
-        rot_rect = orig_rect.copy()
-        rot_rect.center = sm.get_rect().center
-        sm = sm.subsurface(rot_rect).copy()
-
-        submeter.blit(sm, (0, 0))
+            sm2 = pygame.Surface((self.h, self.w), pygame.SRCALPHA)
+            arcSliceD = int(math.ceil(360 * pv))
+            poly = self.arcSlice((int(self.w/2), int(self.h/2)), self.r, self.r*0.75, arcSliceD)
+            if poly:
+                pygame.draw.polygon(sm2, self.colour, poly)
+                submeter.blit(sm2, (0, 0))
 
         self.display.blit(submeter, (self.x, self.y))
 
@@ -292,8 +300,8 @@ class OldSchoolMeter(Widget):
         Widget.__init__(self, x, y)
         self.h, self.w = 100, 146
         self.maxScale = maxScale
-        self.v = 0
-        self.lastV = self.v
+        self.value = 0
+        self.lastV = self.value
         self.constructSurface()
 
     def constructSurface(self):
@@ -317,9 +325,9 @@ class OldSchoolMeter(Widget):
             self.meter.blit(text, (67 + int(math.cos(aR) * (r*1.05)), 92 - int(math.sin(aR) * r)))
 
     def update(self):
-        if self.v != self.lastV:
+        if self.value != self.lastV:
             self.draw()
-            self.lastV = self.v
+            self.lastV = self.value
             return True
 
     def draw(self):
@@ -330,7 +338,7 @@ class OldSchoolMeter(Widget):
         r1 = 70.0
         r2 = 10.0
 
-        aR = (140 - ((self.v / 25.0) * 107)) * (math.pi / 180.0)
+        aR = (140 - ((self.value / self.maxScale) * 107)) * (math.pi / 180.0)
 
         pygame.draw.aaline(surf, (43, 28, 18), 
             (72 + int(math.cos(aR) * (r1*1.05)), 92 - int(math.sin(aR) * r1)),
