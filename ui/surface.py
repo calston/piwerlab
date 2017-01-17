@@ -6,7 +6,7 @@ class Display(object):
         pygame.init()
 
         self.display = pygame.display.set_mode((320, 240), 0, 32)
-        self.font = pygame.font.Font('freesansbold.ttf', 12)
+        self.font = pygame.font.Font('carlito.ttf', 12)
 
     def splash(self):
         self.splash = pygame.image.load('images/pi_black_glow2.png').convert()
@@ -21,10 +21,13 @@ class Display(object):
         pygame.display.flip()
 
 class TouchScreen(Display):
-    def __init__(self):
-        os.environ["SDL_FBDEV"] = "/dev/fb1"
+    def __init__(self, fbdev='/dev/fb1', tsdev='/dev/input/touchscreen'):
+        os.environ["SDL_FBDEV"] = fbdev
         os.environ["SDL_MOUSEDRV"] = "TSLIB"
-        os.environ["SDL_MOUSEDEV"] = "/dev/input/touchscreen"
+        os.environ["SDL_MOUSEDEV"] = tsdev
+        os.environ["TSLIB_CALIBFILE"] = "/etc/pointercal"
+        os.environ["TSLIB_FBDEVICE"] = fbdev
+        os.environ["TSLIB_TSDEVICE"] = tsdev
 
         Display.__init__(self)
 

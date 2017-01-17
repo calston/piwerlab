@@ -1,6 +1,4 @@
 # Serial PSU API
-import serial
-
 from StringIO import StringIO
 
 class FakePSU(object):
@@ -112,7 +110,16 @@ class PSU(object):
          self.ac3, self.ac4) = [0] * 11
 
     def outputEnable(self, chan):
+        self.s.write('%s,0\n' % (chan+1))
+
+    def outputDisable(self, chan):
         self.s.write('%s,1\n' % (chan+1))
+
+    def acEnable(self, chan):
+        self.s.write('9,%s\n' % chan)
+
+    def acDisable(self, chan):
+        self.s.write('10,%s\n' % chan)
 
     def updateState(self):
         self.s.write('8,1\n')
@@ -132,7 +139,7 @@ class PSU(object):
 
     def tick(self):
         # Hook into event loop here
-        if self.s.in_waiting:
+        if self.s.inWaiting():
             bs = self.s.read()
             self.serialBuffer += bs
             if '\n' in bs:
