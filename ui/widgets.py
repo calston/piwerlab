@@ -5,11 +5,17 @@ from pygame.locals import *
 
 class Colours(object):
     white = (255, 255, 255)
+    light_gray = (128, 128, 128)
+    gray = (32, 32, 32)
     black = (0, 0, 0)
+
+    sepia = (120, 100, 82)
+
     red = (255, 0, 0)
     green = (0, 255, 0)
+
     blue = (0, 0, 255)
-    grey = (32, 32, 32)
+    electric_blue = (0, 191, 255)
 
 class Pannel(object):
     def __init__(self, display):
@@ -129,7 +135,7 @@ class SevenSegment(Widget):
             (self.dw - 15, 10),
             (5, 10)
         ]
-        pygame.draw.polygon(self.h_dark, Colours.grey, h_shape)
+        pygame.draw.polygon(self.h_dark, Colours.gray, h_shape)
         pygame.draw.polygon(self.h_light, self.colour, h_shape)
 
         self.v_dark = pygame.Surface((10, dh), pygame.SRCALPHA)
@@ -143,7 +149,7 @@ class SevenSegment(Widget):
             (0, dh - 15),
             (0, 5),
         ]
-        pygame.draw.polygon(self.v_dark, Colours.grey, v_shape)
+        pygame.draw.polygon(self.v_dark, Colours.gray, v_shape)
         pygame.draw.polygon(self.v_light, self.colour, v_shape)
 
         for i in range(self.digits):
@@ -227,15 +233,14 @@ class FancyGauge(Widget):
     def constructSurface(self):
         self.meter = pygame.Surface((self.h, self.w))
 
-        pygame.draw.circle(self.meter, Colours.grey, (int(self.w/2), int(self.h/2)), self.r, int(self.r*0.25))
-        #pygame.draw.circle(self.meter, Colours.black, (int(self.w/2), int(self.h/2)), int(self.r * 0.85))
+        pygame.draw.circle(self.meter, Colours.gray, (int(self.w/2), int(self.h/2)), self.r, int(self.r*0.25))
 
         self.valueFont = pygame.font.Font('carlito.ttf', int(self.r*0.6))
 
         if self.units:
             unitFont = pygame.font.Font('carlito.ttf', int(self.r*0.30))
             w, h = unitFont.size(self.units)
-            units = unitFont.render(self.units, True, (128, 128, 128))
+            units = unitFont.render(self.units, True, Colours.light_gray)
             self.meter.blit(units, ((self.w / 2) - (w/2), ((self.h/2) - (h/2)) + h))
 
     def arcSlice(self, center, rad1, rad2, angle):
@@ -314,7 +319,7 @@ class OldSchoolMeter(Widget):
 
         # Render display markings
         for i in range(6):
-            text = font.render(str(i*segments), True, (120, 100, 82))
+            text = font.render(str(i*segments), True, Colours.sepia) 
 
             a = float(50.0 - (i * 20.0))
 

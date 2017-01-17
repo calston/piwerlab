@@ -15,9 +15,11 @@ maxV = 31
 
 mainScreen = widgets.Pannel(display)
 #mainScreen.addWidget(widgets.Button, "test", 10, 10, 100, 100, )
-m1 = mainScreen.addWidget(widgets.OldSchoolMeter, 100, 1, maxScale=maxV)
-m2 = mainScreen.addWidget(widgets.SevenSegment, 1, 1, 100, 70, colour=widgets.Colours.green, digits=2)
-m3 = mainScreen.addWidget(widgets.FancyGauge, 1, 70, 50, units="Volts", maxScale=maxV)
+#m2 = mainScreen.addWidget(widgets.SevenSegment, 1, 1, 100, 70, colour=widgets.Colours.electric_blue, digits=2)
+m2 = mainScreen.addWidget(widgets.FancyGauge, 1, 1, 50, units="Volts", colour=widgets.Colours.electric_blue, valueFormat="%.2f", maxScale=maxV)
+m3 = mainScreen.addWidget(widgets.FancyGauge, 110, 1, 50, units="Volts", colour=widgets.Colours.electric_blue, valueFormat="%.2f", maxScale=maxV)
+m4 = mainScreen.addWidget(widgets.FancyGauge, 1, 110, 50, units="Amps", colour=widgets.Colours.electric_blue, valueFormat="%.2f", maxScale=maxV)
+m5 = mainScreen.addWidget(widgets.FancyGauge, 110, 110, 50, units="Amps", colour=widgets.Colours.electric_blue, valueFormat="%.2f", maxScale=maxV)
 mainScreen.draw()
 
 clock = pygame.time.Clock()
@@ -46,7 +48,6 @@ def main():
 
             m2.value = cnt
             m3.value = cnt
-            m1.value = cnt
 
         clock.tick(40)
 
