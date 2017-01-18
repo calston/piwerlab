@@ -26,6 +26,8 @@ int setAN = 0;
 int dacValP = 0;
 int dacValN = 0;
 
+bool limiting = false;
+
 byte stateOEP = 0;
 byte stateOEN = 0;
 byte stateITE = 0;
@@ -247,7 +249,7 @@ void tick() {
   // ((vout * 1.8) - 5*RX)/(-1*RX + 1) = Vin
   // Simplified down to.. 
   adcVal = (10 * (long(analogRead(Vsense_N)) * 4)) - 22727;
-  vSenseN = adcVal;f
+  vSenseN = adcVal;
 
   // Read positive current
   adcVal = analogRead(Asense_P);
@@ -264,8 +266,16 @@ void tick() {
   }
 
   // Set DACS
-  if (vSenseP != setVP) {
-    
+  if (!limiting) {
+    // Adjust voltage within 10mv
+    if (vSenseP > (setVP + 10)) {
+      dacValP--;
+      PosDac.output(dacValP);
+    }
+    if (vSenseP < (setVP - 10)) {
+      dacValP++;
+      PosDac.output(dacValP);
+    }
   }
 }
 
