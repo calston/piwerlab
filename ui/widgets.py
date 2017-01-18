@@ -21,14 +21,17 @@ class Colours(object):
 
 class Pannel(object):
     def __init__(self, display):
+        self.x, self.y = 0, 0
         self.widgets = []
         self.display = display
         self.debounce = 0
         self.debounce_time = 20
+        self.offsetX, self.offsetY = 0, 0
 
     def addWidget(self, widgetClass, *args, **kw):
+        kw['parent'] = self
+        kw['display'] = self.display
         w = widgetClass(*args, **kw)
-        w.setDisplay(self.display)
         self.widgets.append(w)
         return w
 
@@ -66,11 +69,24 @@ class Pannel(object):
 
 class Widget(object):
     touch = False
-    def __init__(self, x, y, w=1, h=1):
+    def __init__(self, x, y, w=1, h=1, display=None, parent=None):
         self.x, self.y = x, y
         self.w, self.h = w, h
+
         self.display = None
         self.surf = None
+        self.parent = parent
+        self.display = display
+        self.surf = display.display
+
+        self.offsetX = 0
+        self.offsetY = 0
+
+    def getXY(self):
+        return (
+            self.x + self.parent.x + self.parent.offsetX,
+            self.y + self.parent.y + self.parent.offsetY,
+        )
 
     def update(self):
         # Called on every display loop - must return True if re-render required
@@ -80,13 +96,10 @@ class Widget(object):
         # Draw the initial widget
         pass
 
-    def setDisplay(self, display):
-        self.display = display
-        self.surf = display.display
-
     def inside(self, x, y):
-        inx = (x > self.x) and (x < (self.x + self.w))
-        iny = (y > self.y) and (y < (self.y + self.h))
+        mx, my = self.getXY()
+        inx = (x > mx) and (x < (mx + self.w))
+        iny = (y > my) and (y < (my + self.h))
 
         if inx and iny:
             return True
@@ -110,8 +123,8 @@ class SevenSegment(Widget):
         '9': (True,  True,  True,  False, False, True,  True)
     }
 
-    def __init__(self, x, y, w, h, value = 0, digits = 2, colour = Colours.red, digit_pad = 5):
-        Widget.__init__(self, x, y, w, h)
+    def __init__(self, x, y, w, h, value = 0, digits = 2, colour = Colours.red, digit_pad = 5, **kw):
+        Widget.__init__(self, x, y, w, h, **kw)
 
         self.digits = digits
 
@@ -210,9 +223,10 @@ class SevenSegment(Widget):
         return panel
 
     def draw(self):
+        x, y = self.getXY()
         if self.digit:
-            self.display.blit(self.digit, (self.x, self.y))
-            self.display.blit(self.lightSegments(), (self.x, self.y))
+            self.display.blit(self.digit, (x, y))
+            self.display.blit(self.lightSegments(), (x, y))
 
     def update(self):
         if self.value != self.lastV:
@@ -223,8 +237,8 @@ class SevenSegment(Widget):
 class FancyGauge(Widget):
     def __init__(self, x, y, r, showPercentage = False, valueFormat = "%d",
                  colour=Colours.green, units = None, maxScale = 25,
-                 touched=None):
-        Widget.__init__(self, x, y)
+                 touched=None, **kw):
+        Widget.__init__(self, x, y, **kw)
         self.r = r
         self.h = self.w = (2 * r) + 2
 
@@ -301,8 +315,8 @@ class FancyGauge(Widget):
             if poly:
                 pygame.draw.polygon(sm2, self.colour, poly)
                 submeter.blit(sm2, (0, 0))
-
-        self.display.blit(submeter, (self.x, self.y))
+        x, y = self.getXY()
+        self.display.blit(submeter, (x, y))
 
     def update(self):
         if (self.value != self.lastV) and (self.value <= self.maxScale):
@@ -315,8 +329,8 @@ class FancyGauge(Widget):
             self.callback()
 
 class OldSchoolMeter(Widget):
-    def __init__(self, x, y, maxScale = 25):
-        Widget.__init__(self, x, y)
+    def __init__(self, x, y, maxScale = 25, **kw):
+        Widget.__init__(self, x, y, **kw)
         self.h, self.w = 100, 146
         self.maxScale = maxScale
         self.value = 0
@@ -363,40 +377,75 @@ class OldSchoolMeter(Widget):
             (72 + int(math.cos(aR) * (r1*1.05)), 92 - int(math.sin(aR) * r1)),
             (72 + int(math.cos(aR) * (r2*1.05)), 92 - int(math.sin(aR) * r2)),
         )
-
-        self.display.blit(surf, (self.x, self.y))
+        x, y = self.getXY()
+        self.display.blit(surf, (x, y))
 
 class Button(Widget):
     touch = True
-    def __init__(self, text, x, y, w, h, callback=None):
-        Widget.__init__(self, x, y, w, h)
+    def __init__(self, text, x, y, w, h, callback=None, **kw):
+        Widget.__init__(self, x, y, w, h, **kw)
         self.text = text
         self.callback = callback
 
     def draw(self):
-        btText = self.display.font.render(self.text, True, Colours.white)
+        x, y = self.getXY()
+        btText = self.display.font.render(self.text, True, Colours.light_gray)
 
         tw, th = self.display.font.size(self.text)
         
-        pygame.draw.rect(self.display.display, Colours.white, (self.x, self.y, self.w, self.h), 2)
+        pygame.draw.rect(self.display.display, Colours.light_gray, (x, y, self.w, self.h), 1)
 
-        tx = (self.x + (self.w/2)) - (tw/2)
-        ty = (self.y + (self.h/2)) - (th/2)
+        tx = (x + (self.w/2)) - (tw/2)
+        ty = (y + (self.h/2)) - (th/2)
 
         self.display.blit(btText, (tx, ty))
 
     def touched(self):
+        x, y = self.getXY()
         pygame.draw.rect(self.surf, Colours.black, 
-            (self.x, self.y, self.w, self.h), 2)
+            (x, y, self.w, self.h), 1)
         self.display.flip()
+        self.draw()
         if self.callback:
             self.callback()
+
+class UpButton(Widget):
+    touch = True
+    def __init__(self, x, y, w, h, callback=None, **kw):
+        Widget.__init__(self, x, y, w, h, **kw)
+        self.callback = callback
+
+    def draw(self):
+        x, y = self.getXY()
+        pygame.draw.polygon(self.display.display, Colours.light_gray, [
+                [x + (self.w/2), y+2], 
+                [x + self.w -2, y + self.h - 2], 
+                [x + 2, y + self.h - 2]
+            ], 0)
+
+        pygame.draw.rect(self.display.display, Colours.med_gray, (x, y, self.w, self.h), 1)
+
+    def touched(self):
+        if self.callback:
+            self.callback()
+
+class DownButton(UpButton):
+    touch = True
+    def draw(self):
+        x, y = self.getXY()
+        pygame.draw.polygon(self.display.display, Colours.light_gray, [
+                [x + 2, y + 2],
+                [x + self.w - 2, y + 2],
+                [x + (self.w/2), y + self.h - 2]
+            ], 0)
+
+        pygame.draw.rect(self.display.display, Colours.med_gray, (x, y, self.w, self.h), 1)
 
 class ToggleButton(Widget):
     touch = True
     def __init__(self, text1, text2, x, y, w, h, colour1=Colours.green,
-                 colour2=Colours.red, callback=None):
-        Widget.__init__(self, x, y, w, h)
+                 colour2=Colours.red, callback=None, **kw):
+        Widget.__init__(self, x, y, w, h, **kw)
         self.text1 = text1
         self.text2 = text2
         self.callback = callback
@@ -405,6 +454,7 @@ class ToggleButton(Widget):
         self.colour2 = colour2
 
     def draw(self):
+        x, y = self.getXY()
         if self.state:
             colour = self.colour1
             btText = self.display.font.render(self.text1, True, Colours.white)
@@ -414,16 +464,23 @@ class ToggleButton(Widget):
             btText = self.display.font.render(self.text2, True, Colours.white)
             tw, th = self.display.font.size(self.text2)
         
-        pygame.draw.rect(self.display.display, Colours.white, (
-            self.x, self.y, self.w, self.h), 1)
+        pygame.draw.rect(self.display.display, Colours.light_gray, (
+            x, y, self.w, self.h), 1)
 
         pygame.draw.rect(self.display.display, colour, (
-            self.x + 1, self.y + 1, self.w - 2, self.h - 2), 0)
+            x + 1, y + 1, self.w - 2, self.h - 2), 0)
 
-        tx = (self.x + (self.w/2)) - (tw/2)
-        ty = (self.y + (self.h/2)) - (th/2)
+        tx = (x + (self.w/2)) - (tw/2)
+        ty = (y + (self.h/2)) - (th/2)
 
         self.display.blit(btText, (tx, ty+1))
+
+    def setState(self, state):
+        if self.state != state:
+            self.state = state
+            self.draw()
+            return True
+        return False
 
     def touched(self):
         self.state = not self.state
@@ -432,19 +489,27 @@ class ToggleButton(Widget):
         self.draw()
 
 class Frame(Widget):
-    def __init__(self, text, x, y, w, h):
-        Widget.__init__(self, x, y, w, h)
+    def __init__(self, text, x, y, w, h, **kw):
+        Widget.__init__(self, x, y, w, h, **kw)
         self.text = text
 
+        self.btText = self.display.font.render(self.text, True, Colours.light_gray)
+        self.tw, self.th = self.display.font.size(self.text)
+
+        self.offsetX = 1
+        self.offsetY = 4 + self.th
+
     def draw(self):
-        btText = self.display.font.render(self.text, True, Colours.light_gray)
-
-        tw, th = self.display.font.size(self.text)
-
-        qw, qh = tw + 6, th + 4
+        x, y = self.getXY()
+        qw, qh = self.tw + 6, self.th + 4
         
-        pygame.draw.rect(self.display.display, Colours.med_gray, (self.x, self.y, qw, qh), 1)
+        pygame.draw.rect(self.display.display, Colours.med_gray, (x, y, qw, qh), 1)
 
-        pygame.draw.rect(self.display.display, Colours.med_gray, (self.x, self.y + qh, self.w, self.h - qh), 1)
+        pygame.draw.rect(self.display.display, Colours.med_gray, (x, y + qh, self.w, self.h - qh), 1)
 
-        self.display.blit(btText, (self.x + 3, self.y + 3))
+        self.display.blit(self.btText, (x + 3, y + 3))
+
+    def addWidget(self, widget, *a, **kw):
+        w = self.parent.addWidget(widget, *a, **kw)
+        w.parent = self
+        return w

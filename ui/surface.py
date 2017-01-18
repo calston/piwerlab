@@ -14,10 +14,14 @@ class Display(object):
         self.blit(self.splash, (0,0))
         pygame.display.update()
 
+    def clear(self):
+        self.display.fill((0,0,0))
+
     def blit(self, *a, **kw):
         self.display.blit(*a, **kw)
 
     def flip(self):
+        pygame.draw.rect(self.display, (255,255,0), (0,0,320, 240), 1)
         pygame.display.flip()
 
 class TouchScreen(Display):

@@ -26,6 +26,9 @@ class FakePSU(object):
 
         self.vals = [0] * 11
 
+    def inWaiting(self):
+        return self.in_waiting
+
     def setTE(self, val):
         self.vals[4] = val
         self.writeOut('ACK\n')
@@ -108,12 +111,30 @@ class PSU(object):
         (self.voltageP, self.voltageN, self.currentP, self.currentN,
          self.transformer, self.outputP, self.outputN, self.ac1, self.ac2,
          self.ac3, self.ac4) = [0] * 11
+        self.state_ar = [0] * 7
+
+        self.vsetp = 0
+        self.vsetn = 0
 
     def outputEnable(self, chan):
         self.s.write('%s,0\n' % (chan+1))
 
     def outputDisable(self, chan):
         self.s.write('%s,1\n' % (chan+1))
+
+    def setVoltage(self, chan, v):
+        if (chan == 1):
+            self.vsetp = v
+            self.s.write('4,%s\n' % v)
+        else:
+            self.vsetn = v
+            self.s.write('6,%s\n' % v)
+
+    def setCurrent(self, chan, i):
+        if (chan == 1):
+            self.s.write('5,%s\n' % i)
+        else:
+            self.s.write('7,%s\n' % i)
 
     def acEnable(self, chan):
         self.s.write('9,%s\n' % chan)
@@ -130,6 +151,8 @@ class PSU(object):
             blocks = line.split()
             for block in blocks:
                 vals.extend([int(i) for i in block.split(':')[-1].split(',')])
+
+            self.state_ar = vals[5:]
 
             (self.voltageP, self.voltageN, self.currentP, self.currentN,
              self.transformer, self.outputP, self.outputN, self.ac1, self.ac2,
