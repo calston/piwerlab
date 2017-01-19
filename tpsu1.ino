@@ -3,9 +3,9 @@
 #include <DAC_MCP49xx.h>
 
 #define DAC_P 9
-#define OE_P 8
 #define DAC_N 7
-#define OE_N 6
+#define OE_P 6
+#define OE_N 8
 #define ITE 5
 
 #define AC_1 10
@@ -18,15 +18,16 @@
 #define Asense_P 2
 #define Asense_N 3
 
-int setVP = 0;
+int setVP = 5000;
 int setAP = 0;
-int setVN = 0;
+int setVN = -5000;
 int setAN = 0;
 
 int dacValP = 0;
 int dacValN = 0;
 
-bool limiting = false;
+bool limitingP = false;
+bool limitingN = false;
 
 byte stateOEP = 0;
 byte stateOEN = 0;
@@ -87,7 +88,7 @@ void setup() {
    PosDac.setSPIDivider(SPI_CLOCK_DIV16);
    NegDac.setSPIDivider(SPI_CLOCK_DIV16);
 
-   Serial.begin(9600);
+   Serial.begin(57600);
 
    pinMode(OE_P, OUTPUT);
    pinMode(OE_N, OUTPUT);
@@ -183,13 +184,13 @@ void checkSerial() {
           break;
         case 2:
           // Toggle positive output
-          setPin(OE_P, param);
+          setPin(OE_P, !param);
           stateOEP = param;
           writeEEPROM();
           break;
         case 3:
           // Toggle negative output
-          setPin(OE_N, param);
+          setPin(OE_N, !param);
           stateOEN = param;
           writeEEPROM();
           break;
@@ -266,7 +267,7 @@ void tick() {
   }
 
   // Set DACS
-  if (!limiting) {
+  if (!limitingP) {
     // Adjust voltage within 10mv
     if (vSenseP > (setVP + 10)) {
       dacValP--;
@@ -274,6 +275,17 @@ void tick() {
     }
     if (vSenseP < (setVP - 10)) {
       dacValP++;
+      PosDac.output(dacValP);
+    }
+  }
+  if (!limitingN) {
+    // Adjust voltage within 10mv
+    if (vSenseN > (setVP + 10)) {
+      dacValP++;
+      PosDac.output(dacValP);
+    }
+    if (vSenseP < (setVP - 10)) {
+      dacValP--;
       PosDac.output(dacValP);
     }
   }
@@ -287,3 +299,4 @@ void loop() {
     tick();
   }
 }
+
