@@ -177,8 +177,8 @@ class PowerSupply(object):
 
     def slowTick(self):
         self.psu.updateState()
-        self.posv.value = self.psu.voltageP
-        self.negv.value = self.psu.voltageN
+        self.posv.value = self.psu.voltageP/1000.0
+        self.negv.value = -1*(self.psu.voltageN/1000.0)
 
         q = False
 
@@ -192,12 +192,11 @@ class PowerSupply(object):
         while self.active:
             self.mainScreen.update()
 
-            if (time.time() - self.c > 0.01):
+            if (time.time() - self.c > 0.02):
                 self.c = time.time()
-
                 self.tick()
 
-            if (time.time() - self.long_c > 0.2):
+            if (time.time() - self.long_c > 0.1):
                 self.long_c = time.time()
                 self.slowTick()
 
@@ -210,8 +209,8 @@ class PowerSupply(object):
                 self.mainScreen.sendEvent(event)
 
 if __name__ == '__main__': 
-    #mypsu = PowerSupply(surface.TouchScreen())
-    #ser = serial.Serial('/dev/serial0', 9600))
-    ser = psu.FakePSU(None, None)
-    mypsu = PowerSupply(surface.Dev(), ser)
+    ser = serial.Serial('/dev/serial0', 9600)
+    #ser = psu.FakePSU(None, None)
+    mypsu = PowerSupply(surface.TouchScreen(), ser)
+    #mypsu = PowerSupply(surface.Dev(), ser)
     mypsu.activate()

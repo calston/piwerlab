@@ -66,7 +66,7 @@ class FakePSU(object):
         self.writeOut('ACK\n')
 
     def getSettings(self, val):
-        self.writeOut("V:%s,%s A:%s,%s S:%s,%s,%s,%s,%s,%s,%s\n" % tuple(self.vals))
+        self.writeOut("V:%s,%s A:%s,%s S:0,0,0 R:%s,%s,%s,%s,%s,%s,%s\n" % tuple(self.vals))
 
     def runCmd(self, cmd):
         if ',' in cmd:
@@ -146,24 +146,24 @@ class PSU(object):
         self.s.write('8,1\n')
 
     def lineReceived(self, line):
+        print "LR: ", line
         if line.startswith('V:'):
             vals = []
             blocks = line.split()
             for block in blocks:
                 vals.extend([int(i) for i in block.split(':')[-1].split(',')])
 
-            self.state_ar = vals[5:]
+            self.state_ar = vals[-6:]
 
             (self.voltageP, self.voltageN, self.currentP, self.currentN,
-             self.transformer, self.outputP, self.outputN, self.ac1, self.ac2,
-             self.ac3, self.ac4) = vals
-
-        print "lR: ", line
+             self.s1, self.s2, self.s3, self.s4, self.transformer,
+             self.outputP, self.outputN, self.ac1, self.ac2, self.ac3,
+             self.ac4) = vals
 
     def tick(self):
         # Hook into event loop here
         if self.s.inWaiting():
-            bs = self.s.read()
+            bs = self.s.read(self.s.inWaiting())
             self.serialBuffer += bs
             if '\n' in bs:
                 bl = self.serialBuffer.split('\n')
