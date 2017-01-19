@@ -59,9 +59,9 @@ int readAddress(int addr) {
 
 void readEEPROM() {
   stateOEP = readAddress(0);
-  digitalWrite(OE_P, stateOEP);
+  digitalWrite(OE_P, !stateOEP);
   stateOEN = readAddress(1);
-  digitalWrite(OE_N, stateOEN);
+  digitalWrite(OE_N, !stateOEN);
   stateITE = readAddress(2);
   digitalWrite(ITE, stateITE);
   stateAC1 = readAddress(3);
@@ -230,6 +230,14 @@ void checkSerial() {
           // Diagnostic function - set DAC2
           NegDac.output(param);
           break;
+        case 22:
+          // Diagnostic function - raw ADC values
+          int vsp = analogRead(Vsense_P);
+          int vsn = analogRead(Vsense_N);
+          int asp = analogRead(Asense_P);
+          int asn = analogRead(Asense_N);
+          Serial.println(String("ADC:") + vsp + ", " + vsn + ", " + asp + ", " + asn);
+          break;
       }
     }
   }
@@ -280,13 +288,13 @@ void tick() {
   }
   if (!limitingN) {
     // Adjust voltage within 10mv
-    if (vSenseN > (setVP + 10)) {
-      dacValP++;
-      PosDac.output(dacValP);
+    if (vSenseN > (setVN + 10)) {
+      dacValN++;
+      NegDac.output(dacValN);
     }
-    if (vSenseP < (setVP - 10)) {
-      dacValP--;
-      PosDac.output(dacValP);
+    if (vSenseN < (setVN - 10)) {
+      dacValN--;
+      NegDac.output(dacValN);
     }
   }
 }
