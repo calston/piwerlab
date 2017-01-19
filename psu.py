@@ -153,7 +153,7 @@ class PSU(object):
             for block in blocks:
                 vals.extend([int(i) for i in block.split(':')[-1].split(',')])
 
-            self.state_ar = vals[-7:]
+            self.state_ar = vals[-6:]
 
             (self.voltageP, self.voltageN, self.currentP, self.currentN,
              self.s1, self.s2, self.s3, self.s4, self.transformer,

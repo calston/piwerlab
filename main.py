@@ -192,11 +192,11 @@ class PowerSupply(object):
         while self.active:
             self.mainScreen.update()
 
-            if (time.time() - self.c > 0.1):
+            if (time.time() - self.c > 0.02):
                 self.c = time.time()
                 self.tick()
 
-            if (time.time() - self.long_c > 0.5):
+            if (time.time() - self.long_c > 0.1):
                 self.long_c = time.time()
                 self.slowTick()
 
