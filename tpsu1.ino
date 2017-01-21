@@ -7,16 +7,16 @@
 // Vsense1 ratio
 #define VDRP 4950
 
+#define AC_2 12
+#define AC_1 10
 #define DAC_P 9
+#define OE_N 8
 #define DAC_N 7
 #define OE_P 6
-#define OE_N 8
 #define ITE 5
-
-#define AC_1 10
-#define AC_2 12
 #define AC_3 4
 #define AC_4 3
+#define TS1 2
 
 #define Vsense_P 0
 #define Vsense_N 1
@@ -311,7 +311,7 @@ long analogReadV(int samples, int adc) {
 }
 
 void updateReadings(){
-  int cval = 0;
+  long cval = 0;
 
   // Read positive voltage
   vSenseP = (analogReadV(10, Vsense_P) * (VDRP+offsetP)) / 1000;
@@ -326,7 +326,7 @@ void updateReadings(){
   }
 
   // Read negative current
-  cval =  analogReadV(10, Asense_P) - 2500;
+  cval =  analogReadV(10, Asense_N) - 2500;
   if (cval > 0) {
     aSenseN = (cval * 1000) / 185;
   }  
