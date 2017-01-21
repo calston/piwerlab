@@ -10,6 +10,63 @@ import psu
 
 import random
 
+
+class PresetScreen(object):
+    def __init__(self, display, psu, parent):
+        self.display = display
+        self.parent = parent
+        self.psu = psu
+        self.active = False
+
+        self.screen = widgets.Pannel(display)
+
+        frame = self.screen.addWidget(widgets.Frame,
+            "Select preset", 2, 2, 318, 238)
+
+        frame.addWidget(widgets.Button, "3.3 / -3.3", 2, 2, 120, 40,
+                        self.setPreset(3300))
+        frame.addWidget(widgets.Button, "5 / -5", 2, 47, 120, 40,
+                        self.setPreset(5000))
+        frame.addWidget(widgets.Button, "9 / -9", 2, 92, 120, 40,
+                        self.setPreset(9000))
+        frame.addWidget(widgets.Button, "12 / -12", 2, 137, 120, 40,
+                        self.setPreset(12000))
+        frame.addWidget(widgets.Button, "15 / -15", 2, 182, 120, 40,
+                        self.setPreset(15000))
+
+        self.screen.addWidget(widgets.Button, "Cancel", 230, 190, 80, 40, self.cancel)
+
+    def setVoltage(self, voltage):
+        self.active = False
+        self.psu.setVoltage(1, voltage)
+        self.psu.setVoltage(2, -1 * voltage)
+
+    def setPreset(self, voltage):
+        return lambda: self.setVoltage(voltage)
+
+    def cancel(self):
+        self.active = False
+
+    def activate(self):
+        self.active = True
+        self.display.clear()
+        self.screen.draw()
+        self.mainLoop()
+
+    def mainLoop(self):
+        while self.active:
+            self.screen.update()
+
+            self.parent.clock.tick(40)
+
+            for event in pygame.event.get():
+                if event.type in (QUIT, KEYDOWN):
+                    self.active = False
+
+                self.screen.sendEvent(event)
+        self.parent.activate()
+
+
 class ConfigScreen(object):
     def __init__(self, display, psu, channel, parent, negative=False):
         self.display = display
@@ -19,9 +76,9 @@ class ConfigScreen(object):
         self.active = False
         self.negative = negative
 
-        self.configScreen = widgets.Pannel(display)
+        self.screen = widgets.Pannel(display)
 
-        frame = self.configScreen.addWidget(widgets.Frame,
+        frame = self.screen.addWidget(widgets.Frame,
             "Voltage", 2, 2, 150, 155)
         self.vdisp = frame.addWidget(widgets.SevenSegment, 5, 37, 143, 60,
             digits=3, msd=2, colour=widgets.Colours.electric_blue)
@@ -36,7 +93,7 @@ class ConfigScreen(object):
         frame.addWidget(widgets.DownButton, 106, 100, bw, bw, self.setVDisp(-0.1),
             colour=widgets.Colours.electric_blue)
 
-        cframe = self.configScreen.addWidget(widgets.Frame,
+        cframe = self.screen.addWidget(widgets.Frame,
             "Current", 162, 2, 150, 155)
         self.cdisp = cframe.addWidget(widgets.SevenSegment, 5, 37, 143, 60,
             digits=3, msd=1, colour=widgets.Colours.electric_blue)
@@ -55,8 +112,8 @@ class ConfigScreen(object):
         cframe.addWidget(widgets.DownButton, 106, 100, bw, bw, self.setCDisp(-0.01),
             colour=widgets.Colours.electric_blue)
 
-        self.configScreen.addWidget(widgets.Button, "Save", 140, 190, 80, 40, self.save)
-        self.configScreen.addWidget(widgets.Button, "Cancel", 230, 190, 80, 40, self.cancel)
+        self.screen.addWidget(widgets.Button, "Save", 140, 190, 80, 40, self.save)
+        self.screen.addWidget(widgets.Button, "Cancel", 230, 190, 80, 40, self.cancel)
 
     def setMax(self, disp, inc, mx):
         disp.value += inc
@@ -85,12 +142,12 @@ class ConfigScreen(object):
         self.cdisp.value = self.psu.cset[self.channel - 1]/1000.0
         self.active = True
         self.display.clear()
-        self.configScreen.draw()
+        self.screen.draw()
         self.mainLoop()
 
     def mainLoop(self):
         while self.active:
-            self.configScreen.update()
+            self.screen.update()
 
             self.parent.clock.tick(40)
 
@@ -98,7 +155,7 @@ class ConfigScreen(object):
                 if event.type in (QUIT, KEYDOWN):
                     self.active = False
 
-                self.configScreen.sendEvent(event)
+                self.screen.sendEvent(event)
         self.parent.activate()
 
 class PowerSupply(object):
@@ -110,8 +167,15 @@ class PowerSupply(object):
         self.mainScreen = widgets.Pannel(display)
         self.configScreen1 = ConfigScreen(display, self.psu, 1, self)
         self.configScreen2 = ConfigScreen(display, self.psu, 2, self, True)
+        self.presetScreen = PresetScreen(display, self.psu, self)
 
         self.screen = self.mainScreen
+
+        self.mainScreen.addWidget(widgets.Button, "Presets", 225, 138, 90, 40,
+                                  callback=self.openPresets)
+
+        self.ite = self.mainScreen.addWidget(widgets.ToggleButton, "Main On",
+            "Main Off", 225, 190, 90, 40, callback=self.togglePower)
 
         # Channel 1
         ch1 = self.mainScreen.addWidget(widgets.Frame, "Channel 1", 1, 1, 220, 110)
@@ -187,6 +251,12 @@ class PowerSupply(object):
             self.active = True
             self.mainLoop()
 
+    def togglePower(self, state):
+        self.psu.toggleInput(state)
+
+    def openPresets(self):
+        self.presetScreen.activate()
+
     def btnConfig1(self):
         self.configScreen1.activate()
 
@@ -234,6 +304,7 @@ class PowerSupply(object):
 
     def slowTick(self):
         self.psu.updateState()
+        self.ite.setState(self.psu.transformer)
         self.posv.value = self.psu.voltageP/1000.0
         if self.psu.currentP >= 0:
             self.pcvals.append(self.psu.currentP/1000.0)

@@ -136,6 +136,9 @@ class PSU(object):
         else:
             self.s.write('7,%s\n' % i)
 
+    def toggleInput(self, state):
+        self.s.write('1,%s\n' % (state and 1 or 0))
+
     def acEnable(self, chan):
         self.s.write('9,%s\n' % chan)
 
@@ -158,6 +161,12 @@ class PSU(object):
              self.vset[0], self.vset[1], self.cset[0], self.cset[1],
              self.transformer, self.outputP, self.outputN, self.ac1, self.ac2,
              self.ac3, self.ac4) = vals
+
+            if self.voltageP < 0:
+                self.voltageP = 0
+            
+            if self.voltageN > 0:
+                self.voltageN = 0
 
             self.currentP -= 16
             self.currentN -= 16

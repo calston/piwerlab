@@ -21,7 +21,6 @@ class Display(object):
         self.display.blit(*a, **kw)
 
     def flip(self):
-        pygame.draw.rect(self.display, (255,255,0), (0,0,320, 240), 1)
         pygame.display.flip()
 
 class TouchScreen(Display):
