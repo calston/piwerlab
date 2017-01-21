@@ -5,7 +5,7 @@
 // Reference voltage measured from device
 #define Vref 4881
 // Vsense1 ratio
-#define VDRP 4925
+#define VDRP 4950
 
 #define DAC_P 9
 #define DAC_N 7
@@ -50,8 +50,11 @@ long aSenseP = 0;
 long vSenseN = 0;
 long aSenseN = 0;
 
+int offsetP = 320;
+int offsetN = 200;
+
 unsigned long previousMillis = 0;
-const long interval = 200;
+const long interval = 10;
 
 DAC_MCP49xx PosDac(DAC_MCP49xx::MCP4921, DAC_P);
 DAC_MCP49xx NegDac(DAC_MCP49xx::MCP4921, DAC_N);
@@ -63,6 +66,17 @@ int readAddress(int addr) {
   } else {
     return 0;
   }
+}
+
+void EEPROMWriteInt(int addr, int p_value) {
+  EEPROM.write(addr, ((p_value >> 0) & 0xFF));
+  EEPROM.write(addr + 1, ((p_value >> 8) & 0xFF));
+}
+
+unsigned int EEPROMReadInt(int addr) {
+  byte lowByte = EEPROM.read(addr);
+  byte highByte = EEPROM.read(addr + 1);
+  return ((lowByte << 0) & 0xFF) + ((highByte << 8) & 0xFF00);
 }
 
 void readEEPROM() {
@@ -80,6 +94,8 @@ void readEEPROM() {
   digitalWrite(AC_3, stateAC3);
   stateAC4 = readAddress(6);
   digitalWrite(AC_4, stateAC4);
+  offsetP = EEPROMReadInt(7);
+  offsetN = EEPROMReadInt(9);
 }
 
 void writeEEPROM() {
@@ -170,6 +186,12 @@ void setA_P(int param) {
 void setV_N(int param) {
   // Set negative voltage
   setVN = param;
+  dacValN = (4095.0/20000.0)*-1*setVN;
+  NegDac.output(dacValN);
+  delay(5); // Wait for DAC to settle a bit
+  updateReadings();
+  // Allow recalibration
+  vlockN = false;
   Serial.println("ACK");
 }
 
@@ -242,18 +264,38 @@ void checkSerial() {
         case 20:
           // Diagnostic function - set DAC1
           PosDac.output(param);
+          Serial.println("ACK");
           break;
+          
         case 21:
           // Diagnostic function - set DAC2
           NegDac.output(param);
+          Serial.println("ACK");
           break;
+          
         case 22:
           // Diagnostic function - raw ADC voltages
-          int vsp = analogReadV(10, Vsense_P);
-          int vsn = analogReadV(10, Vsense_N);
-          int asp = analogReadV(10, Asense_P);
-          int asn = analogReadV(10, Asense_N);
-          Serial.println(String("ADC:") + vsp + ", " + vsn + ", " + asp + ", " + asn);
+          {
+            int vsp = analogRead(Vsense_P);
+            int vsn = analogRead(Vsense_N);
+            int asp = analogRead(Asense_P);
+            int asn = analogRead(Asense_N);
+            Serial.println(String("ADC:") + vsp + ", " + vsn + ", " + asp + ", " + asn);
+          }
+          break;
+          
+        case 23:
+          // Diagnostic function - change offset calibration
+          offsetP = param;
+          EEPROMWriteInt(7, offsetP);
+          Serial.println("ACK");
+          break;
+          
+        case 24:
+          // Diagnostic function - change negative offset calibration
+          offsetN = param;
+          EEPROMWriteInt(9, offsetN);
+          Serial.println("ACK");
           break;
       }
     }
@@ -272,10 +314,10 @@ void updateReadings(){
   int cval = 0;
 
   // Read positive voltage
-  vSenseP = (analogReadV(10, Vsense_P) * VDRP) / 1000;
+  vSenseP = (analogReadV(10, Vsense_P) * (VDRP+offsetP)) / 1000;
 
   // Read negative voltage
-  vSenseN = ((Vref/2) - analogReadV(10, Vsense_N)) * 10;
+  vSenseN = (((Vref/2)-offsetN) - analogReadV(10, Vsense_N)) * -10;
 
   // Read positive current
   cval =  analogReadV(10, Asense_P) - 2500;
