@@ -248,11 +248,11 @@ void checkSerial() {
           NegDac.output(param);
           break;
         case 22:
-          // Diagnostic function - raw ADC values
-          int vsp = analogReadAvg(10, Vsense_P);
-          int vsn = analogReadAvg(10, Vsense_N);
-          int asp = analogReadAvg(10, Asense_P);
-          int asn = analogReadAvg(10, Asense_N);
+          // Diagnostic function - raw ADC voltages
+          int vsp = analogReadV(10, Vsense_P);
+          int vsn = analogReadV(10, Vsense_N);
+          int asp = analogReadV(10, Asense_P);
+          int asn = analogReadV(10, Asense_N);
           Serial.println(String("ADC:") + vsp + ", " + vsn + ", " + asp + ", " + asn);
           break;
       }
@@ -260,40 +260,31 @@ void checkSerial() {
   }
 }
 
-long analogReadAvg(int samples, int adc) {
+long analogReadV(int samples, int adc) {
   long sum = 0;
   for (int i=0; i < samples; i++) {
     sum += analogRead(adc);
   }
-  return (sum / samples);
+  return ((sum / samples) * Vref) / 1000;
 }
 
 void updateReadings(){
-  long adcVal = 0;
   int cval = 0;
 
   // Read positive voltage
-  adcVal = analogReadAvg(10, Vsense_P);
-  vSenseP = (((adcVal * Vref)/1000)  * VDRP)/1000;
+  vSenseP = (analogReadV(10, Vsense_P) * VDRP) / 1000;
 
   // Read negative voltage
-  // Gets a bit complicated now... 
-  // RX = 0.819672131147541
-  // ((vout * 1.8) - 5*RX)/(-1*RX + 1) = Vin
-  // Simplified down to.. 
-  adcVal = (10 * (analogReadAvg(10, Vsense_N) * 4881)) - 22727;
-  vSenseN = adcVal;
+  vSenseN = ((Vref/2) - analogReadV(10, Vsense_N)) * 10;
 
   // Read positive current
-  adcVal = analogReadAvg(10, Asense_P);
-  cval =  (adcVal * 4) - 2500;
+  cval =  analogReadV(10, Asense_P) - 2500;
   if (cval >= 0) {
     aSenseP = (cval * 1000) / 185;
   }
 
   // Read negative current
-  adcVal = analogReadAvg(10, Asense_P);
-  cval =  (adcVal * 4) - 2500;
+  cval =  analogReadV(10, Asense_P) - 2500;
   if (cval > 0) {
     aSenseN = (cval * 1000) / 185;
   }  
