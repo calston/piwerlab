@@ -2,10 +2,15 @@
 #include <EEPROM.h>
 #include <DAC_MCP49xx.h>
 
+// Reference voltage measured from device
+#define Vref 4881
+// Vsense1 ratio
+#define VDRP 4950
+
 #define DAC_P 9
-#define OE_P 8
 #define DAC_N 7
-#define OE_N 6
+#define OE_P 6
+#define OE_N 8
 #define ITE 5
 
 #define AC_1 10
@@ -18,15 +23,19 @@
 #define Asense_P 2
 #define Asense_N 3
 
-int setVP = 0;
+int setVP = 5000;
 int setAP = 0;
-int setVN = 0;
+int setVN = -5000;
 int setAN = 0;
 
 int dacValP = 0;
 int dacValN = 0;
 
-bool limiting = false;
+bool limitingP = false;
+bool limitingN = false;
+
+bool vlockP = false;
+bool vlockN = false;
 
 byte stateOEP = 0;
 byte stateOEN = 0;
@@ -36,13 +45,16 @@ byte stateAC2 = 0;
 byte stateAC3 = 0;
 byte stateAC4 = 0;
 
-int vSenseP = 0;
-int aSenseP = 0;
-int vSenseN = 0;
-int aSenseN = 0;
+long vSenseP = 0;
+long aSenseP = 0;
+long vSenseN = 0;
+long aSenseN = 0;
+
+int offsetP = 320;
+int offsetN = 200;
 
 unsigned long previousMillis = 0;
-const long interval = 200;
+const long interval = 10;
 
 DAC_MCP49xx PosDac(DAC_MCP49xx::MCP4921, DAC_P);
 DAC_MCP49xx NegDac(DAC_MCP49xx::MCP4921, DAC_N);
@@ -56,11 +68,22 @@ int readAddress(int addr) {
   }
 }
 
+void EEPROMWriteInt(int addr, int p_value) {
+  EEPROM.write(addr, ((p_value >> 0) & 0xFF));
+  EEPROM.write(addr + 1, ((p_value >> 8) & 0xFF));
+}
+
+unsigned int EEPROMReadInt(int addr) {
+  byte lowByte = EEPROM.read(addr);
+  byte highByte = EEPROM.read(addr + 1);
+  return ((lowByte << 0) & 0xFF) + ((highByte << 8) & 0xFF00);
+}
+
 void readEEPROM() {
   stateOEP = readAddress(0);
-  digitalWrite(OE_P, stateOEP);
+  digitalWrite(OE_P, !stateOEP);
   stateOEN = readAddress(1);
-  digitalWrite(OE_N, stateOEN);
+  digitalWrite(OE_N, !stateOEN);
   stateITE = readAddress(2);
   digitalWrite(ITE, stateITE);
   stateAC1 = readAddress(3);
@@ -71,9 +94,12 @@ void readEEPROM() {
   digitalWrite(AC_3, stateAC3);
   stateAC4 = readAddress(6);
   digitalWrite(AC_4, stateAC4);
+  offsetP = EEPROMReadInt(7);
+  offsetN = EEPROMReadInt(9);
 }
 
 void writeEEPROM() {
+  // Remove these later XXX - we should never boot with the outputs enabled.
   EEPROM.write(0, stateOEP);
   EEPROM.write(1, stateOEN);
   EEPROM.write(2, stateITE);
@@ -87,7 +113,7 @@ void setup() {
    PosDac.setSPIDivider(SPI_CLOCK_DIV16);
    NegDac.setSPIDivider(SPI_CLOCK_DIV16);
 
-   Serial.begin(9600);
+   Serial.begin(57600);
 
    pinMode(OE_P, OUTPUT);
    pinMode(OE_N, OUTPUT);
@@ -98,7 +124,9 @@ void setup() {
    pinMode(AC_4, OUTPUT);
 
    readEEPROM();
-
+   dacValP = 200;
+   PosDac.output(dacValP);
+   NegDac.output(1024);
    Serial.println("PSUOS 1.0 READY");
 }
 
@@ -140,6 +168,12 @@ void setAC(int param, int val) {
 void setV_P(int param) {
   // Set positive voltage
   setVP = param;
+  dacValP = (4095.0/20000.0)*setVP;
+  PosDac.output(dacValP);
+  delay(5); // Wait for DAC to settle a bit
+  updateReadings();
+  // Allow recalibration
+  vlockP = false;
   Serial.println("ACK");
 }
 
@@ -152,6 +186,12 @@ void setA_P(int param) {
 void setV_N(int param) {
   // Set negative voltage
   setVN = param;
+  dacValN = (4095.0/20000.0)*-1*setVN;
+  NegDac.output(dacValN);
+  delay(5); // Wait for DAC to settle a bit
+  updateReadings();
+  // Allow recalibration
+  vlockN = false;
   Serial.println("ACK");
 }
 
@@ -183,13 +223,13 @@ void checkSerial() {
           break;
         case 2:
           // Toggle positive output
-          setPin(OE_P, param);
+          setPin(OE_P, !param);
           stateOEP = param;
           writeEEPROM();
           break;
         case 3:
           // Toggle negative output
-          setPin(OE_N, param);
+          setPin(OE_N, !param);
           stateOEN = param;
           writeEEPROM();
           break;
@@ -224,57 +264,110 @@ void checkSerial() {
         case 20:
           // Diagnostic function - set DAC1
           PosDac.output(param);
+          Serial.println("ACK");
           break;
+          
         case 21:
           // Diagnostic function - set DAC2
           NegDac.output(param);
+          Serial.println("ACK");
+          break;
+          
+        case 22:
+          // Diagnostic function - raw ADC voltages
+          {
+            int vsp = analogRead(Vsense_P);
+            int vsn = analogRead(Vsense_N);
+            int asp = analogRead(Asense_P);
+            int asn = analogRead(Asense_N);
+            Serial.println(String("ADC:") + vsp + ", " + vsn + ", " + asp + ", " + asn);
+          }
+          break;
+          
+        case 23:
+          // Diagnostic function - change offset calibration
+          offsetP = param;
+          EEPROMWriteInt(7, offsetP);
+          Serial.println("ACK");
+          break;
+          
+        case 24:
+          // Diagnostic function - change negative offset calibration
+          offsetN = param;
+          EEPROMWriteInt(9, offsetN);
+          Serial.println("ACK");
           break;
       }
     }
   }
 }
 
-void tick() {
-  // Async clock loopf
-  long adcVal = 0;
+long analogReadV(int samples, int adc) {
+  long sum = 0;
+  for (int i=0; i < samples; i++) {
+    sum += analogRead(adc);
+  }
+  return ((sum / samples) * Vref) / 1000;
+}
+
+void updateReadings(){
   int cval = 0;
 
   // Read positive voltage
-  adcVal = (long(analogRead(Vsense_P)) * 4 * 5545)/1000;
-  vSenseP = adcVal;
+  vSenseP = (analogReadV(10, Vsense_P) * (VDRP+offsetP)) / 1000;
 
   // Read negative voltage
-  // Gets a bit complicated now... 
-  // RX = 0.819672131147541
-  // ((vout * 1.8) - 5*RX)/(-1*RX + 1) = Vin
-  // Simplified down to.. 
-  adcVal = (10 * (long(analogRead(Vsense_N)) * 4)) - 22727;
-  vSenseN = adcVal;
+  vSenseN = (((Vref/2)-offsetN) - analogReadV(10, Vsense_N)) * -10;
 
   // Read positive current
-  adcVal = analogRead(Asense_P);
-  cval =  (adcVal * 4) - 2500;
+  cval =  analogReadV(10, Asense_P) - 2500;
   if (cval >= 0) {
     aSenseP = (cval * 1000) / 185;
   }
-  
+
   // Read negative current
-  adcVal = analogRead(Asense_P);
-  cval =  (adcVal * 4) - 2500;
+  cval =  analogReadV(10, Asense_P) - 2500;
   if (cval > 0) {
     aSenseN = (cval * 1000) / 185;
-  }
+  }  
+}
+
+void tick() {
+  // Async clock loopf
+  updateReadings();
 
   // Set DACS
-  if (!limiting) {
-    // Adjust voltage within 10mv
-    if (vSenseP > (setVP + 10)) {
-      dacValP--;
-      PosDac.output(dacValP);
+  if (!limitingP) {
+    if (vlockP) {
+      // If we drift more than 150mv then readjust
+      if ((vSenseP > (setVP + 150)) || (vSenseP < (setVP - 150))) {
+        vlockP = false;
+      }
+    } else {
+      // Adjust voltage within 10mv
+      if (vSenseP > (setVP + 10)) {
+        dacValP--;
+        PosDac.output(dacValP);
+      }
+      else if (vSenseP < (setVP - 10)) {
+        dacValP++;
+        PosDac.output(dacValP);
+      }
+      else {
+        // Lock DAC value when reading is within spec
+        vlockP = true;
+      }
     }
-    if (vSenseP < (setVP - 10)) {
-      dacValP++;
-      PosDac.output(dacValP);
+  }
+  if (!limitingN) {
+    // Adjust voltage within 10mv
+    if (vSenseN > (setVN + 10)) {
+      dacValN++;
+      NegDac.output(dacValN);
+    }
+    if (vSenseN < (setVN - 10)) {
+      dacValN--;
+      NegDac.output(dacValN);
     }
   }
 }
@@ -287,3 +380,4 @@ void loop() {
     tick();
   }
 }
+
