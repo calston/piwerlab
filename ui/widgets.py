@@ -25,7 +25,7 @@ class Pannel(object):
         self.widgets = []
         self.display = display
         self.debounce = 0
-        self.debounce_time = 20
+        self.debounce_time = 5
         self.offsetX, self.offsetY = 0, 0
 
     def addWidget(self, widgetClass, *args, **kw):
@@ -123,21 +123,19 @@ class SevenSegment(Widget):
         '9': (True,  True,  True,  False, False, True,  True)
     }
 
-    def __init__(self, x, y, w, h, value = 0, digits = 2, colour = Colours.red, digit_pad = 5, **kw):
+    def __init__(self, x, y, w, h, value=0, digits=2, msd=1, colour=Colours.red, digit_pad=5, **kw):
         Widget.__init__(self, x, y, w, h, **kw)
 
         self.digits = digits
-
         self.colour = colour
-
         self.lastV = self.value = value
         self.digit_pad = digit_pad
+        self.msd = msd
 
         self.constructSurface()
 
     def constructSurface(self):
         self.digit = pygame.Surface((self.w, self.h))
-
         
         self.dw = int((self.w / self.digits) - self.digit_pad)
 
@@ -190,11 +188,20 @@ class SevenSegment(Widget):
         panel = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
         dst = (self.h_dark, self.h_light, self.v_dark, self.v_light)
 
-        v = ("%f" % self.value)
+        v = "%f" % self.value
+        nd = len(v.split('.')[0])
+        if nd < self.msd:
+            v = '0'*(self.msd - nd) + v
+
         cn = 0
+            
         for c in v:
-            if cn > self.digits:
+            if cn >= self.digits:
                 break
+
+            if (c == '.') and (cn <= self.digits):
+                pygame.draw.circle(panel, self.colour, (x + self.dw + 2, self.h-5), 5)
+                continue
 
             if c in self.charMap:
                 x = (self.dw + self.digit_pad) * cn
@@ -209,16 +216,13 @@ class SevenSegment(Widget):
                     (0, (x+5, (self.h/2) - 5)),
                 ]
 
-                for i, v in enumerate(self.charMap[c]):
-                    if v:
+                for i, s in enumerate(self.charMap[c]):
+                    if s:
                         args = (dst[segments[i][0] + 1], segments[i][1])
                     else:
                         args = (dst[segments[i][0]], segments[i][1])
 
                     panel.blit(*args)
-
-            if (c == '.') and cn < self.digits:
-                pygame.draw.circle(panel, self.colour, (x + self.dw + 2, self.h-5), 5)
 
         return panel
 
@@ -411,19 +415,24 @@ class Button(Widget):
 
 class UpButton(Widget):
     touch = True
-    def __init__(self, x, y, w, h, callback=None, **kw):
+    def __init__(self, x, y, w, h, callback=None, border=0, colour=Colours.light_gray, **kw):
         Widget.__init__(self, x, y, w, h, **kw)
         self.callback = callback
+        self.colour = colour
+        self.border = border
 
     def draw(self):
         x, y = self.getXY()
-        pygame.draw.polygon(self.display.display, Colours.light_gray, [
+        pygame.draw.polygon(self.display.display, self.colour, [
                 [x + (self.w/2), y+2], 
                 [x + self.w -2, y + self.h - 2], 
                 [x + 2, y + self.h - 2]
             ], 0)
 
-        pygame.draw.rect(self.display.display, Colours.med_gray, (x, y, self.w, self.h), 1)
+        if self.border > 0:
+            print repr(self.border)
+            pygame.draw.rect(self.display.display, Colours.med_gray,
+                             (x, y, self.w, self.h), self.border)
 
     def touched(self):
         if self.callback:
@@ -433,13 +442,15 @@ class DownButton(UpButton):
     touch = True
     def draw(self):
         x, y = self.getXY()
-        pygame.draw.polygon(self.display.display, Colours.light_gray, [
+        pygame.draw.polygon(self.display.display, self.colour, [
                 [x + 2, y + 2],
                 [x + self.w - 2, y + 2],
                 [x + (self.w/2), y + self.h - 2]
             ], 0)
 
-        pygame.draw.rect(self.display.display, Colours.med_gray, (x, y, self.w, self.h), 1)
+        if self.border > 0:
+            pygame.draw.rect(self.display.display, Colours.med_gray,
+                             (x, y, self.w, self.h), self.border)
 
 class ToggleButton(Widget):
     touch = True

@@ -111,12 +111,14 @@ class PSU(object):
         (self.voltageP, self.voltageN, self.currentP, self.currentN,
          self.transformer, self.outputP, self.outputN, self.ac1, self.ac2,
          self.ac3, self.ac4) = [0] * 11
+
         self.state_ar = [0] * 7
 
-        self.vsetp = 0
-        self.vsetn = 0
+        self.vset = [0, 0]
+        self.cset = [0, 0]
 
     def outputEnable(self, chan):
+        self.s.write('1,1\n')
         self.s.write('%s,0\n' % (chan+1))
 
     def outputDisable(self, chan):
@@ -124,10 +126,8 @@ class PSU(object):
 
     def setVoltage(self, chan, v):
         if (chan == 1):
-            self.vsetp = v
             self.s.write('4,%s\n' % v)
         else:
-            self.vsetn = v
             self.s.write('6,%s\n' % v)
 
     def setCurrent(self, chan, i):
@@ -146,7 +146,6 @@ class PSU(object):
         self.s.write('8,1\n')
 
     def lineReceived(self, line):
-        print "LR: ", line
         if line.startswith('V:'):
             vals = []
             blocks = line.split()
@@ -156,9 +155,12 @@ class PSU(object):
             self.state_ar = vals[-6:]
 
             (self.voltageP, self.voltageN, self.currentP, self.currentN,
-             self.s1, self.s2, self.s3, self.s4, self.transformer,
-             self.outputP, self.outputN, self.ac1, self.ac2, self.ac3,
-             self.ac4) = vals
+             self.vset[0], self.vset[1], self.cset[0], self.cset[1],
+             self.transformer, self.outputP, self.outputN, self.ac1, self.ac2,
+             self.ac3, self.ac4) = vals
+
+            self.currentP -= 16
+            self.currentN -= 16
 
     def tick(self):
         # Hook into event loop here
