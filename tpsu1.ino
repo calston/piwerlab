@@ -7,12 +7,17 @@
 // Vsense1 ratio
 #define VDRP 4950
 
+// Maximum deviation
+#define MaxDev 100
+// Acceptable deviation
+#define PDev 20
+
 #define AC_2 12
 #define AC_1 10
 #define DAC_P 9
-#define OE_N 8
+#define OE_P 8
 #define DAC_N 7
-#define OE_P 6
+#define OE_N 6
 #define ITE 5
 #define AC_3 4
 #define AC_4 3
@@ -36,6 +41,9 @@ bool limitingN = false;
 
 bool vlockP = false;
 bool vlockN = false;
+
+bool vresetP = false;
+bool vresetN = false;
 
 byte stateOEP = 0;
 byte stateOEN = 0;
@@ -169,11 +177,14 @@ void setV_P(int param) {
   // Set positive voltage
   setVP = param;
   dacValP = (4095.0/20000.0)*setVP;
+  setPin(OE_P, LOW);
   PosDac.output(dacValP);
   delay(5); // Wait for DAC to settle a bit
   updateReadings();
   // Allow recalibration
   vlockP = false;
+  // Wait for vlock before setting OE_P to desired state
+  vresetP = true;
   Serial.println("ACK");
 }
 
@@ -187,11 +198,14 @@ void setV_N(int param) {
   // Set negative voltage
   setVN = param;
   dacValN = (4095.0/20000.0)*-1*setVN;
+  setPin(OE_N, LOW);
   NegDac.output(dacValN);
   delay(5); // Wait for DAC to settle a bit
   updateReadings();
   // Allow recalibration
   vlockN = false;
+  // Wait for vlock before setting OE_P to desired state
+  vresetN = true;
   Serial.println("ACK");
 }
 
@@ -223,13 +237,13 @@ void checkSerial() {
           break;
         case 2:
           // Toggle positive output
-          setPin(OE_P, !param);
+          setPin(OE_P, param);
           stateOEP = param;
           writeEEPROM();
           break;
         case 3:
           // Toggle negative output
-          setPin(OE_N, !param);
+          setPin(OE_N, param);
           stateOEN = param;
           writeEEPROM();
           break;
@@ -340,34 +354,53 @@ void tick() {
   if (!limitingP) {
     if (vlockP) {
       // If we drift more than 150mv then readjust
-      if ((vSenseP > (setVP + 150)) || (vSenseP < (setVP - 150))) {
+      if ((vSenseP > (setVP + MaxDev)) || (vSenseP < (setVP - MaxDev))) {
         vlockP = false;
       }
     } else {
-      // Adjust voltage within 10mv
-      if (vSenseP > (setVP + 10)) {
+      // Adjust voltage within 20mv
+      if (vSenseP > (setVP + PDev)) {
         dacValP--;
         PosDac.output(dacValP);
       }
-      else if (vSenseP < (setVP - 10)) {
+      else if (vSenseP < (setVP - PDev)) {
         dacValP++;
         PosDac.output(dacValP);
       }
       else {
         // Lock DAC value when reading is within spec
         vlockP = true;
+        if (vresetP) {
+          vresetP = false;
+          setPin(OE_P, stateOEP);
+        }
       }
     }
   }
   if (!limitingN) {
-    // Adjust voltage within 10mv
-    if (vSenseN > (setVN + 10)) {
-      dacValN++;
-      NegDac.output(dacValN);
+    if (vlockN) {
+      if ((vSenseN > (setVN - MaxDev)) || (vSenseN < (setVN + MaxDev))) {
+        vlockN = false;
+      }
     }
-    if (vSenseN < (setVN - 10)) {
-      dacValN--;
-      NegDac.output(dacValN);
+    else {
+      // Adjust to within 20mv 
+      if (vSenseN > (setVN + PDev)) {
+        dacValN++;
+        NegDac.output(dacValN);
+      }
+      else if (vSenseN < (setVN - PDev)) {
+        dacValN--;
+        NegDac.output(dacValN);
+      }
+      else {
+        // Lock DAC changes
+        vlockN = true;
+        if (vresetN) {
+          vresetN = false;
+          setPin(OE_N, stateOEN);
+        }
+      }
     }
   }
 }
