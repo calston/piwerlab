@@ -62,7 +62,7 @@ int offsetP = 320;
 int offsetN = 200;
 
 unsigned long previousMillis = 0;
-const long interval = 10;
+const long interval = 1;
 
 DAC_MCP49xx PosDac(DAC_MCP49xx::MCP4921, DAC_P);
 DAC_MCP49xx NegDac(DAC_MCP49xx::MCP4921, DAC_N);
