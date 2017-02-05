@@ -149,6 +149,7 @@ class PSU(object):
         self.s.write('8,1\n')
 
     def lineReceived(self, line):
+        print(line)
         if line.startswith('V:'):
             vals = []
             blocks = line.split()
